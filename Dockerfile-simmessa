@@ -4,35 +4,47 @@
 
 # docker run --name ap2-simmessa -d ap2-simmessa sleep 5m; docker cp ap2-simmessa:/home/dev/annepro2_c15_simmessa.bin .
 
+# based on work made available by Davide Viti <zinosat@gmail.com>
+
 FROM debian:bullseye
 MAINTAINER Simone Messaggi <simmessa@gmail.com>
 
-# put C15 or C18 here...
-ENV MODEL=C15
-ENV MODEL_LOW=c15
+# The following might help if you live in Italy, otherwise you can choose a mirror in your country, please find a complete list on https://www.debian.org/mirror/
+# country code is the 2 letters XX in ftp.XX.debian.org, uncomment the relevant line or feel free to alter this variable
 
+# ENV DEBIAN_MIRROR=ftp.de.debian.org
+# ENV DEBIAN_MIRROR=ftp.fr.debian.org
+# ENV DEBIAN_MIRROR=ftp.es.debian.org
+# ENV DEBIAN_MIRROR=ftp.uk.debian.org
+# ENV DEBIAN_MIRROR=ftp.us.debian.org
+ENV DEBIAN_MIRROR=ftp.it.debian.org
+
+# Good for Italy, you might want to change this...
+ENV TZ /usr/share/zoneinfo/Europe/Rome
+
+# Set a close mirror for apt get
 RUN sed -i \
-    -e "s|deb.debian.org|debian.fastweb.it|g" \
+    -e "s|deb.debian.org|${DEBIAN_MIRROR}|g" \
     /etc/apt/sources.list
+
+  # pkg-config libusb-1.0-0-dev gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib \
 
 RUN apt-get update && \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
   build-essential less git sudo \
-  pkg-config libusb-1.0-0-dev gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib \
+  pkg-config gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib \
   ca-certificates
 
+# dummy sudo-enabled user for gcc make
 RUN adduser --disabled-password --gecos '' dev && \
     adduser dev sudo && \
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-RUN cd /home/dev; sudo -H -u dev git clone https://github.com/simmessa/qmk_firmware.git annepro-qmk --recursive --depth 1 
-RUN cd /home/dev/annepro-qmk; sudo -H -u dev git pull 
-RUN rm /home/dev/annepro-qmk/keyboards/annepro2/config.h
-RUN cd /home/dev/annepro-qmk && make -Wno-error annepro2/${MODEL_LOW}:simmessa
-# RUN cd /home/dev; sudo -H -u dev git clone https://github.com/simmessa/AnnePro2-Shine.git --recursive --depth 1 && cd AnnePro2-Shine && make MODEL=${MODEL}
 
-RUN ls /home/dev/annepro-qmk/.build/*
-RUN cp /home/dev/annepro-qmk/.build/annepro2_${MODEL_LOW}_simmessa.bin /home/dev/
-#RUN cp /home/dev/AnnePro2-Shine/build/annepro2-shine-${MODEL}.bin /home/dev/
+ENV QMK_REPOSITORY=https://github.com/simmessa/qmk_firmware.git
 
-ENV TZ /usr/share/zoneinfo/Europe/Rome
+#1st time clone
+RUN cd /home/dev; sudo -H -u dev git clone ${QMK_REPOSITORY} annepro-qmk --recursive --depth 1
+
+WORKDIR /home/dev
+COPY entry-qmk.bash /home/dev/entry-qmk.bash
